@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>1.8</java.version>
+        <aws.sdk.version>2.25.40</aws.sdk.version>
     </properties>
 
     <dependencies>
@@ -29,6 +30,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <!-- cr-java-0065 fix: Spring Session with Redis backend for distributed session
+             management via Amazon ElastiCache for Redis. Replaces in-process HttpSession
+             storage with a shared Redis cluster, enabling stateless horizontal scaling. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        <!-- cr-java-0065 fix: Spring Boot Redis (Lettuce) starter required by Spring Session
+             to connect to Amazon ElastiCache for Redis. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
         <!-- SECURITY VIOLATION: log4j 2.14.1 has critical CVE-2021-44228 (Log4Shell) -->
         <dependency>
@@ -46,6 +60,43 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <!-- AWS SDK v2 S3 dependency for cloud-native object storage (replaces hard-coded file paths) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK v2 URL Connection HTTP client -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK v2 Secrets Manager dependency for cloud-native secrets management -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ssm</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK v2 SSM Parameter Store dependency for cr-java-0071 (Hard-coded Environment URLs) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- Jackson for JSON parsing of Secrets Manager secret values -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- cr-java-0090 fix: AWS SDK v2 Cognito Identity Provider for cloud-native user
+             identity management. Replaces file-based authentication with Amazon Cognito
+             User Pool, providing centralized, encrypted, and auditable authentication. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
+            <version>${aws.sdk.version}</version>
         </dependency>
     </dependencies>
 

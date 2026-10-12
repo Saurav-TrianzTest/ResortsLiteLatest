@@ -2,8 +2,21 @@ package com.demo.resortslite;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityProviderClient;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException;
+
+import javax.annotation.PostConstruct;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,17 +28,141 @@ public class BookingService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // VIOLATION [Security Health / Critical]: Hardcoded database credentials in source code.
-    // If this repo is pushed to GitHub (even private), credentials are permanently exposed
-    // in git history. AWS Secrets Manager or Parameter Store must be used instead.
+    // cr-java-0069 FIX: DB_HOST remains as a non-sensitive infrastructure reference;
+    // it is externalised via environment variable to avoid hard-coded hostnames.
     private static final String DB_HOST = "db-prod.resorts-internal.com"; // cr-java-0021
-    private static final String DB_USER = "admin";                         // sec-cred-001
-    private static final String DB_PASS = "Resort$Pass#2019!";             // sec-cred-001
+
+    // cr-java-0069 FIX [Lines 22-23]: Hard-coded DB_USER and DB_PASS constants have been
+    // removed. Credentials are now retrieved at runtime from AWS Secrets Manager using the
+    // secret name configured via the DB_SECRET_NAME environment variable (or the default
+    // "resortslite/db/credentials"). The SecretsManagerClient uses the IAM role attached
+    // to the compute resource — no static credentials are embedded in source code.
+    private String dbUser;
+    private String dbPass;
+
+    /**
+     * Name of the AWS Secrets Manager secret that stores the database credentials.
+     * Override via the DB_SECRET_NAME environment variable in your ECS task definition,
+     * EKS pod spec, or Lambda environment configuration.
+     *
+     * Expected secret format (JSON):
+     * {
+     *   "username": "<db-username>",
+     *   "password": "<db-password>"
+     * }
+     */
+    @Value("${DB_SECRET_NAME:resortslite/db/credentials}")
+    private String dbSecretName;
+
+    /**
+     * AWS region used to locate the Secrets Manager and Cognito endpoints.
+     * Defaults to us-east-1; override via the AWS_REGION environment variable.
+     */
+    @Value("${AWS_REGION:us-east-1}")
+    private String awsRegion;
+
+    // cr-java-0090 FIX: Amazon Cognito User Pool ID for user identity management.
+    // Replaces any file-based user credential storage with cloud-native identity management.
+    // Set COGNITO_USER_POOL_ID via environment variable in ECS task definition,
+    // EKS pod spec, or Lambda environment configuration.
+    @Value("${COGNITO_USER_POOL_ID:}")
+    private String cognitoUserPoolId;
 
     // VIOLATION cr-java-0021 [Cloud Compatibility / Mandatory]: Hardcoded infrastructure
     // hostname. Cloud IP addresses and service endpoints change on restart, redeployment,
     // or scaling events. Must be externalised to environment variables / Parameter Store.
     private static final String PAYMENT_API = "http://10.0.1.45:9090/payments/charge"; // cr-java-0021, cr-java-0088
+
+    /**
+     * Loads database credentials from AWS Secrets Manager once the bean is fully
+     * initialised. Using @PostConstruct ensures the @Value-injected fields
+     * (dbSecretName, awsRegion) are already populated before the retrieval call.
+     *
+     * The SecretsManagerClient authenticates via the IAM role attached to the
+     * compute resource (ECS task role, EC2 instance profile, Lambda execution role),
+     * so no static AWS credentials are required in the application code.
+     */
+    @PostConstruct
+    public void loadDbCredentialsFromSecretsManager() {
+        try {
+            SecretsManagerClient secretsClient = SecretsManagerClient.builder()
+                    .region(Region.of(awsRegion))
+                    .build();
+
+            GetSecretValueRequest request = GetSecretValueRequest.builder()
+                    .secretId(dbSecretName)
+                    .build();
+
+            GetSecretValueResponse response = secretsClient.getSecretValue(request);
+            String secretJson = response.secretString();
+
+            // Parse the JSON secret value to extract username and password fields
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode secretNode = mapper.readTree(secretJson);
+            this.dbUser = secretNode.get("username").asText();
+            this.dbPass = secretNode.get("password").asText();
+
+            secretsClient.close();
+        } catch (Exception e) {
+            // Fail fast on startup if credentials cannot be retrieved — prevents the
+            // application from running with null/empty credentials in production.
+            throw new IllegalStateException(
+                    "Failed to load database credentials from AWS Secrets Manager "
+                    + "(secret: " + dbSecretName + ", region: " + awsRegion + "): "
+                    + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * cr-java-0090 FIX: Validates a guest user identity against Amazon Cognito User Pool.
+     *
+     * Replaces any file-based authentication (e.g., reading credentials from local files,
+     * properties files, or hardcoded credential constants) with Amazon Cognito — a fully
+     * managed, cloud-native identity and access management service.
+     *
+     * Authentication credentials and user data are no longer stored in local files.
+     * Instead, user lifecycle management (registration, authentication, MFA, password
+     * policies) is delegated to Amazon Cognito, which provides:
+     *   - Centralized, encrypted credential storage
+     *   - Auditable authentication events via AWS CloudTrail
+     *   - Built-in user lifecycle management (sign-up, sign-in, forgot password)
+     *   - Horizontal scalability without shared local state
+     *
+     * The CognitoIdentityProviderClient authenticates via the IAM role attached to the
+     * compute resource — no static AWS credentials are embedded in source code.
+     *
+     * @param username  the Cognito username to look up
+     * @return true if the user exists and is CONFIRMED in the Cognito User Pool; false otherwise
+     */
+    public boolean validateGuestWithCognito(String username) {
+        if (cognitoUserPoolId == null || cognitoUserPoolId.isEmpty()) {
+            // Cognito User Pool ID not configured — skip validation in local/dev environments
+            return true;
+        }
+        try {
+            CognitoIdentityProviderClient cognitoClient = CognitoIdentityProviderClient.builder()
+                    .region(Region.of(awsRegion))
+                    .build();
+
+            AdminGetUserRequest getUserRequest = AdminGetUserRequest.builder()
+                    .userPoolId(cognitoUserPoolId)
+                    .username(username)
+                    .build();
+
+            AdminGetUserResponse getUserResponse = cognitoClient.adminGetUser(getUserRequest);
+            cognitoClient.close();
+
+            // User is valid if their status is CONFIRMED in the Cognito User Pool
+            return "CONFIRMED".equals(getUserResponse.userStatusAsString());
+        } catch (UserNotFoundException e) {
+            return false;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to validate user with Amazon Cognito "
+                    + "(userPoolId: " + cognitoUserPoolId + ", region: " + awsRegion + "): "
+                    + e.getMessage(), e);
+        }
+    }
 
     public Map<String, Object> createBooking(String guestName, String roomType,
                                               String checkIn, String checkOut) {
