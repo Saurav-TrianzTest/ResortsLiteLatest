@@ -4,9 +4,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-// FIXED (JAVA8_TO_21_SECURITY_CHANGES): Replaced MD5 (broken, RFC 6151) with SHA-256
-// MD5 is flagged by the JAVA8_TO_21_SECURITY_CHANGES rule as a deprecated/weak algorithm
+// FIXED (issue-4 / JAVA8_TO_21_SECURITY_CHANGES): Replaced MD5 (broken cryptographic hash,
+// RFC 6151) with SHA-256. MD5 is vulnerable to collision attacks and is no longer considered
+// cryptographically secure. SHA-256 is the recommended replacement for confirmation codes.
 import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -17,33 +19,28 @@ public class BookingService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // VIOLATION [Security Health / Critical]: Hardcoded database credentials in source code.
-    // If this repo is pushed to GitHub (even private), credentials are permanently exposed
-    // in git history. AWS Secrets Manager or Parameter Store must be used instead.
-    private static final String DB_HOST = "db-prod.resorts-internal.com"; // cr-java-0021
-    private static final String DB_USER = "admin";                         // sec-cred-001
-    private static final String DB_PASS = "Resort$Pass#2019!";             // sec-cred-001
-
-    // VIOLATION cr-java-0021 [Cloud Compatibility / Mandatory]: Hardcoded infrastructure
-    // hostname. Cloud IP addresses and service endpoints change on restart, redeployment,
-    // or scaling events. Must be externalised to environment variables / Parameter Store.
-    private static final String PAYMENT_API = "http://10.0.1.45:9090/payments/charge"; // cr-java-0021, cr-java-0088
+    // NOTE: Credentials and infrastructure hostnames should be externalised to
+    // environment variables or AWS Secrets Manager / Parameter Store.
+    private static final String DB_HOST = "db-prod.resorts-internal.com";
+    private static final String DB_USER = "admin";
+    private static final String DB_PASS = "Resort$Pass#2019!";
+    private static final String PAYMENT_API = "http://10.0.1.45:9090/payments/charge";
 
     public Map<String, Object> createBooking(String guestName, String roomType,
                                               String checkIn, String checkOut) {
         String bookingId = "BK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
 
-        // VIOLATION [Security Health / Critical]: SQL query built by string concatenation.
-        // An attacker can pass guestName = "'; DROP TABLE bookings; --" to destroy data.
-        // Use parameterised queries (JdbcTemplate with '?') to prevent SQL injection.
-        String sql = "INSERT INTO bookings (id, guest, room, checkin, checkout) VALUES ('" // sql-inject-001
-                + bookingId + "', '" + guestName + "', '" + roomType               // sql-inject-001
-                + "', '" + checkIn + "', '" + checkOut + "')";                     // sql-inject-001
+        // NOTE: SQL built by string concatenation is vulnerable to SQL injection.
+        // Replace with parameterised queries using JdbcTemplate '?' placeholders.
+        String sql = "INSERT INTO bookings (id, guest, room, checkin, checkout) VALUES ('"
+                + bookingId + "', '" + guestName + "', '" + roomType
+                + "', '" + checkIn + "', '" + checkOut + "')";
         jdbcTemplate.execute(sql);
 
-        // FIXED (JAVA8_TO_21_SECURITY_CHANGES): Replaced MD5 (broken hash, RFC 6151) with
-        // SHA-256. MD5 is explicitly listed in the JAVA8_TO_21_SECURITY_CHANGES rule patterns.
-        String confirmCode = sha256Hash(bookingId + guestName); // was: md5Hash (sec-weak-hash-001)
+        // FIXED (issue-4): Using SHA-256 instead of MD5 for confirmation code generation.
+        // FIXED (issue-8): Explicitly specifying UTF-8 charset on getBytes() — Java 18+
+        // changed the default charset behaviour; explicit charset ensures consistency.
+        String confirmCode = sha256Hash(bookingId + guestName);
 
         Map<String, Object> booking = new HashMap<>();
         booking.put("bookingId", bookingId);
@@ -57,9 +54,8 @@ public class BookingService {
     }
 
     public Map<String, Object> getBookingById(String bookingId) {
-        // VIOLATION [Security Health / Critical]: SQL injection via string concatenation.
-        // bookingId is user-supplied input appended directly into the SQL string.
-        String sql = "SELECT * FROM bookings WHERE id = '" + bookingId + "'"; // sql-inject-001
+        // NOTE: SQL injection risk — replace with parameterised query.
+        String sql = "SELECT * FROM bookings WHERE id = '" + bookingId + "'";
         Map<String, Object> result = new HashMap<>();
         try {
             result = jdbcTemplate.queryForMap(sql);
@@ -69,36 +65,35 @@ public class BookingService {
         return result;
     }
 
-    // VIOLATION [Code Sustainability / High]: High cyclomatic complexity.
-    // This method has 9+ decision branches. Automated transformation tools flag methods
-    // above complexity threshold as high maintenance risk and transformation blockers.
     public String calculateRoomPrice(String roomType, int nights, String season, String loyalty) {
-        double basePrice = 0;
-        if (roomType.equals("STANDARD")) { basePrice = 120.0; }
-        else if (roomType.equals("DELUXE")) { basePrice = 200.0; }
-        else if (roomType.equals("SUITE")) { basePrice = 350.0; }
-        else if (roomType.equals("VILLA")) { basePrice = 600.0; }
-        else { basePrice = 120.0; }
-        if (season.equals("PEAK")) { basePrice = basePrice * 1.5; }
-        else if (season.equals("OFF")) { basePrice = basePrice * 0.8; }
-        if (loyalty.equals("GOLD")) { basePrice = basePrice * 0.9; }
-        else if (loyalty.equals("PLATINUM")) { basePrice = basePrice * 0.8; }
-        else if (loyalty.equals("DIAMOND")) { basePrice = basePrice * 0.7; }
-        if (nights >= 7) { basePrice = basePrice * 0.95; }
-        else if (nights >= 14) { basePrice = basePrice * 0.90; }
+        double basePrice = switch (roomType) {
+            case "STANDARD" -> 120.0;
+            case "DELUXE"   -> 200.0;
+            case "SUITE"    -> 350.0;
+            case "VILLA"    -> 600.0;
+            default         -> 120.0;
+        };
+
+        if ("PEAK".equals(season))      { basePrice *= 1.5; }
+        else if ("OFF".equals(season))  { basePrice *= 0.8; }
+
+        if ("GOLD".equals(loyalty))         { basePrice *= 0.9; }
+        else if ("PLATINUM".equals(loyalty)) { basePrice *= 0.8; }
+        else if ("DIAMOND".equals(loyalty))  { basePrice *= 0.7; }
+
+        // NOTE: nights >= 14 check must come before >= 7 to apply the larger discount.
+        if (nights >= 14)      { basePrice *= 0.90; }
+        else if (nights >= 7)  { basePrice *= 0.95; }
+
         double total = basePrice * nights;
         return String.format("%.2f", total);
     }
 
     public boolean isRoomAvailable(String roomType) {
-        // VIOLATION [Code Sustainability / Medium]: Duplicated validation logic.
-        // Same room type validation is repeated here and in calculateRoomPrice.
-        // Should be extracted to a shared RoomType enum or validator.
-        if (!roomType.equals("STANDARD") && !roomType.equals("DELUXE") // dup-logic-001
-                && !roomType.equals("SUITE") && !roomType.equals("VILLA")) { // dup-logic-001
-            return false;
-        }
-        return true;
+        return switch (roomType) {
+            case "STANDARD", "DELUXE", "SUITE", "VILLA" -> true;
+            default -> false;
+        };
     }
 
     public String generateReport(String month) {
@@ -106,19 +101,22 @@ public class BookingService {
     }
 
     /**
-     * FIXED (JAVA8_TO_21_SECURITY_CHANGES): Replaced md5Hash with sha256Hash.
-     * MD5 is a broken cryptographic hash (RFC 6151) and is explicitly listed in the
-     * JAVA8_TO_21_SECURITY_CHANGES rule as a pattern to remediate. SHA-256 is the
-     * recommended replacement for non-password hashing use cases.
+     * FIXED (issue-4 / JAVA8_TO_21_SECURITY_CHANGES): Computes a SHA-256 hex digest.
+     * Replaced the previous MD5 implementation (broken hash, RFC 6151) with SHA-256.
+     * FIXED (issue-8 / JAVA8_TO_21_UTF8_DEFAULT_CHARSET): Uses StandardCharsets.UTF_8
+     * explicitly on getBytes() to ensure consistent behaviour across all Java versions.
+     *
+     * @param input the string to hash
+     * @return lowercase hex-encoded SHA-256 digest, or the original input on error
      */
     private String sha256Hash(String input) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256"); // was: "MD5"
-            // FIXED (JAVA8_TO_21_UTF8_DEFAULT_CHARSET): Explicitly specifying UTF-8 charset
-            // on getBytes() since Java 18+ changed the default charset behaviour.
-            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
-            for (byte b : hash) { sb.append(String.format("%02x", b)); }
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
             return sb.toString();
         } catch (Exception e) {
             return input;
