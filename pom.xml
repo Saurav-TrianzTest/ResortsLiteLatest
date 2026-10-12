@@ -9,11 +9,14 @@
         JAVA 25 UPGRADE: Spring Boot 3.4.x is the minimum baseline that supports Java 25.
         Spring Boot 3.x requires Jakarta EE 10 (jakarta.* namespace) instead of javax.*.
         Rule: JAVA8_TO_25_SPRING_BOOT_BASELINE, JAVA8_TO_25_SPRING_BOOT_COMPATIBILITY
+        Previous version: 2.7.15 (incompatible with Java 25)
+        Updated version:  3.4.1  (full Java 25 + Jakarta EE 10 support)
     -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.4.1</version>
+        <relativePath/>
     </parent>
 
     <groupId>com.demo</groupId>
@@ -24,51 +27,102 @@
 
     <properties>
         <!--
-            JAVA 25 UPGRADE: Updated from 1.8 to 25.
-            Rule: JAVA8_TO_25_BUILD_TOOLCHAIN, JAVA8_TO_25_LOMBOK_CONFIGURATION,
-                  JAVA8_TO_25_DEPENDENCY_UPDATES
+            JAVA 25 UPGRADE: Updated java.version from 1.8 to 25.
+            Rule: JAVA8_TO_25_BUILD_TOOLCHAIN
         -->
         <java.version>25</java.version>
         <!--
-            JAVA 25 UPGRADE: Use maven.compiler.release instead of source/target pair.
-            Rule: JAVA8_TO_25_BUILD_TOOLCHAIN
+            JAVA 25 UPGRADE: Use maven.compiler.release instead of the legacy
+            source/target pair. The release flag enforces a single consistent
+            API surface and prevents accidental use of newer APIs.
+            Rule: JAVA8_TO_25_BUILD_TOOLCHAIN, JAVA8_TO_25_MAVEN_COMPILER_RELEASE
         -->
         <maven.compiler.release>25</maven.compiler.release>
+        <!--
+            JAVA 25 UPGRADE: MySQL Connector/J 8.2.0 uses the new artifact coordinates
+            com.mysql:mysql-connector-j and is fully compatible with Java 25.
+            The legacy mysql:mysql-connector-java artifact is deprecated.
+            Rule: JAVA8_TO_25_DEPENDENCY_UPDATES
+        -->
+        <mysql.connector.version>8.2.0</mysql.connector.version>
     </properties>
 
     <dependencies>
+        <!-- Spring Boot Web (REST controllers, embedded Tomcat) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
+        <!-- Spring Boot JDBC (JdbcTemplate) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
+
         <!--
-            JAVA 25 UPGRADE: Removed log4j-core 2.14.1 (CVE-2021-44228 Log4Shell).
-            Spring Boot 3.x uses Logback by default; explicit log4j-core is not needed.
-            If Log4j2 is required, use 2.23.1+ which is Java 25 compatible.
-        -->
-        <!--
-            JAVA 25 UPGRADE: Removed commons-collections 3.2.1 (CVE-2015-6420 RCE).
-            Rule: JAVA8_TO_25_DEPENDENCY_CONFLICTS
-            If Apache Commons Collections is needed, use commons-collections4 4.4+.
+            JAVA 25 UPGRADE: H2 in-memory database for development/testing.
+            Spring Boot 3.4.x manages the H2 version (2.2.x) which is Java 25 compatible.
         -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!--
+            JAVA 25 UPGRADE: MySQL Connector/J — updated artifact coordinates.
+            Old: mysql:mysql-connector-java:8.0.33 (deprecated, incompatible with Java 25)
+            New: com.mysql:mysql-connector-j:8.2.0 (Java 25 compatible, new groupId/artifactId)
+            Rule: JAVA8_TO_25_DEPENDENCY_UPDATES
+            Scope is 'runtime'; activate this dependency when connecting to a real MySQL instance.
+        -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>${mysql.connector.version}</version>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!--
+            JAVA 25 UPGRADE: log4j-core 2.14.1 REMOVED.
+            Reason: CVE-2021-44228 (Log4Shell — critical RCE) and Java 25 incompatibility.
+            Spring Boot 3.x uses Logback by default; no explicit log4j-core dependency needed.
+            If Log4j2 is required, use version 2.23.1+ which is Java 25 compatible.
+            Rule: JAVA8_TO_25_DEPENDENCY_CONFLICTS, JAVA8_TO_25_SECURITY_VULNERABILITIES
+        -->
+
+        <!--
+            JAVA 25 UPGRADE: commons-collections 3.2.1 REMOVED.
+            Reason: CVE-2015-6420 (RCE via Java deserialization) and Java 25 incompatibility.
+            If Apache Commons Collections is needed, use commons-collections4:4.4 instead.
+            Rule: JAVA8_TO_25_DEPENDENCY_CONFLICTS, JAVA8_TO_25_SECURITY_VULNERABILITIES
+        -->
+
+        <!--
+            JAVA 25 UPGRADE: thymeleaf-extras-java8time is NOT needed with Spring Boot 3.x.
+            Spring Boot 3.x / Thymeleaf 3.1.x has built-in java.time support via
+            #temporals dialect — no extra dependency required.
+            Old: org.thymeleaf.extras:thymeleaf-extras-java8time:3.0.4.RELEASE (deprecated)
+            Rule: JAVA8_TO_25_DEPENDENCY_UPDATES
+        -->
+
+        <!-- Spring Boot Test (JUnit 5 / Jupiter is included transitively) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
             <!--
-                JAVA 25 UPGRADE: Upgraded maven-compiler-plugin to 3.13.0 for Java 25 support.
-                Configured with release flag (not source/target) per Java 25 best practices.
+                JAVA 25 UPGRADE: Upgraded maven-compiler-plugin from 3.7.0 to 3.13.0.
+                Configured with <release>25</release> (replaces legacy <source>/<target> pair).
                 Rule: JAVA8_TO_25_BUILD_TOOLCHAIN, JAVA8_TO_25_MAVEN_PLUGIN_UPDATES,
-                      JAVA8_TO_25_LOMBOK_CONFIGURATION
+                      JAVA8_TO_25_MAVEN_COMPILER_RELEASE
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -78,8 +132,10 @@
                     <release>25</release>
                 </configuration>
             </plugin>
+
             <!--
                 JAVA 25 UPGRADE: Upgraded maven-surefire-plugin to 3.2.5 for Java 25 support.
+                Older versions of surefire do not support the Java 25 module system correctly.
                 Rule: JAVA8_TO_25_MAVEN_PLUGIN_UPDATES
             -->
             <plugin>
@@ -87,6 +143,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
             </plugin>
+
+            <!-- Spring Boot Maven Plugin — version managed by parent POM -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

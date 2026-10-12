@@ -7,9 +7,11 @@ import org.springframework.stereotype.Service;
 /*
  * JAVA 25 UPGRADE: Replaced MD5 (broken, RFC 6151) with SHA-256.
  * MD5 is disabled by default in Java 25 security policy for security-sensitive contexts.
+ * SHA-256 is the minimum recommended algorithm per NIST guidelines.
  * Rule: JAVA8_TO_25_CRYPTOGRAPHY_AND_TLS
  */
 import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -122,9 +124,11 @@ public class BookingService {
     private String sha256Hash(String input) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            byte[] hash = md.digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
-            for (byte b : hash) { sb.append(String.format("%02x", b)); }
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
             return sb.toString();
         } catch (Exception e) {
             return input;

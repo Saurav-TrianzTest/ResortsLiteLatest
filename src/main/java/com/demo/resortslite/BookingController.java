@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
  * JAVA 25 UPGRADE: Replaced javax.servlet.http.HttpSession with
  * jakarta.servlet.http.HttpSession.
  * Spring Boot 3.x / Jakarta EE 10 uses the jakarta.* namespace exclusively.
+ * The javax.* namespace was removed in Jakarta EE 9+.
  * Rule: JAVA8_TO_25_JAKARTA_NAMESPACE_MIGRATION, JAVA8_TO_25_JAKARTA_EE_MIGRATION
  */
 import jakarta.servlet.http.HttpSession;

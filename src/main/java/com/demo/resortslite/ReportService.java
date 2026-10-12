@@ -8,12 +8,18 @@ import java.io.IOException;
 /*
  * JAVA 25 UPGRADE: Replaced java.util.Date / java.text.SimpleDateFormat with
  * java.time.LocalDateTime and java.time.format.DateTimeFormatter.
- * java.util.Date and SimpleDateFormat are legacy APIs; java.time is the standard
- * since Java 8 and is the recommended approach on Java 25.
+ *
+ * java.util.Date and SimpleDateFormat are legacy APIs that:
+ *   - Are not thread-safe (SimpleDateFormat)
+ *   - Have confusing month/year offsets (Date)
+ *   - Are superseded by java.time (JSR-310) since Java 8
+ *
+ * java.time is the recommended approach on Java 25.
  * Rule: JAVA8_TO_25_DATE_TIME_CHANGES
  */
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,11 +54,12 @@ public class ReportService {
 
             /*
              * JAVA 25 UPGRADE: Explicitly specify UTF-8 charset in FileWriter constructor.
-             * Java 18+ uses UTF-8 as the default charset (JEP 400), but explicit charset
-             * specification is required for correctness and portability across all platforms.
+             * Java 18+ changed the default charset to UTF-8 (JEP 400), but explicit charset
+             * specification is required for correctness and portability across all platforms
+             * and JVM configurations.
              * Rule: JAVA8_TO_25_UTF8_DEFAULT_CHARSET
              */
-            FileWriter writer = new FileWriter(fullPath, java.nio.charset.StandardCharsets.UTF_8);
+            FileWriter writer = new FileWriter(fullPath, StandardCharsets.UTF_8);
             writer.write("BookingID,GuestName,RoomType,CheckIn,CheckOut,Amount\n");
             writer.write("BK-001,John Smith,SUITE,2024-03-01,2024-03-05,1750.00\n");
             writer.write("BK-002,Jane Doe,DELUXE,2024-03-03,2024-03-07,960.00\n");
@@ -83,7 +90,17 @@ public class ReportService {
         /*
          * JAVA 25 UPGRADE: Replaced java.util.Date + SimpleDateFormat with
          * java.time.LocalDateTime + DateTimeFormatter.
-         * Legacy date/time APIs are not thread-safe and are superseded by java.time.
+         *
+         * Legacy java.util.Date issues:
+         *   - SimpleDateFormat is not thread-safe (causes data corruption under concurrency)
+         *   - Date.getYear() returns year - 1900 (confusing offset)
+         *   - Date.getMonth() returns 0-based month (off-by-one errors)
+         *
+         * java.time.LocalDateTime + DateTimeFormatter:
+         *   - Thread-safe (immutable)
+         *   - Clear, unambiguous API
+         *   - ISO-8601 compliant by default
+         *
          * Rule: JAVA8_TO_25_DATE_TIME_CHANGES
          */
         String timestamp = LocalDateTime.now()
