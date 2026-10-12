@@ -47,6 +47,46 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- AWS SDK v2 S3 dependency for cloud-native object storage (replaces hard-coded file paths) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.25.11</version>
+        </dependency>
+        <!-- AWS Secrets Manager SDK v2 – replaces hard-coded DB credentials (cr-java-0069) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+            <version>2.25.11</version>
+        </dependency>
+        <!-- AWS SSM Parameter Store SDK v2 – externalises hard-coded environment URLs (cr-java-0071) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ssm</artifactId>
+            <version>2.25.11</version>
+        </dependency>
+        <!-- cr-java-0090 FIX: Amazon Cognito Identity Provider SDK v2 – replaces file-based
+             authentication with Amazon Cognito User Pool identity management. User credentials
+             and tokens are managed centrally in Cognito; no user data is stored in local files. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
+            <version>2.25.11</version>
+        </dependency>
+        <!-- cr-java-0065 FIX: Spring Session Data Redis – transparently replaces the in-process
+             HttpSession with a Redis-backed session store. All session.setAttribute() /
+             session.getAttribute() calls are serialised to Amazon ElastiCache for Redis,
+             enabling stateless application instances and safe horizontal scaling. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+            <version>2.7.4</version>
+        </dependency>
+        <!-- Spring Data Redis (Lettuce client) – required by Spring Session Data Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
