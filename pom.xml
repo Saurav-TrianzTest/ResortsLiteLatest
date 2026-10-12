@@ -67,6 +67,52 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- AWS SDK v2 for S3 — replaces hard-coded file-system paths (cr-java-0061) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.25.60</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>auth</artifactId>
+            <version>2.25.60</version>
+        </dependency>
+        <!-- AWS Secrets Manager SDK v2 — retrieves DB credentials at runtime (cr-java-0069) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+            <version>2.25.60</version>
+        </dependency>
+        <!-- Jackson for parsing Secrets Manager JSON payloads -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- cr-java-0090 FIX: AWS Cognito Identity Provider SDK v2 — delegates user
+             authentication and identity management to Amazon Cognito User Pools,
+             replacing any file-based or in-memory credential storage. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
+            <version>2.25.60</version>
+        </dependency>
+        <!-- cr-java-0065 FIX: Spring Session Data Redis — stores HTTP session in Amazon
+             ElastiCache for Redis instead of JVM-local memory, enabling stateless instances
+             and safe horizontal scaling. spring.session.store-type=redis in
+             application.properties activates the Redis session repository automatically. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        <!-- Spring Boot Redis (Lettuce) starter — provides the RedisConnectionFactory
+             that Spring Session uses to communicate with Amazon ElastiCache for Redis.
+             Connection details (host, port, TLS) are supplied via environment variables
+             SPRING_REDIS_HOST / SPRING_REDIS_PORT / SPRING_REDIS_SSL injected at runtime. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
