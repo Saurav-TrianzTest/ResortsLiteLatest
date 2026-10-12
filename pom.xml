@@ -5,20 +5,35 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!--
+        JAVA 25 UPGRADE: Spring Boot 3.4.x is the minimum baseline that supports Java 25.
+        Spring Boot 3.x requires Jakarta EE 10 (jakarta.* namespace) instead of javax.*.
+        Rule: JAVA8_TO_25_SPRING_BOOT_BASELINE, JAVA8_TO_25_SPRING_BOOT_COMPATIBILITY
+    -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.4.1</version>
     </parent>
 
     <groupId>com.demo</groupId>
     <artifactId>resortsLite</artifactId>
     <version>1.0.0</version>
     <name>ResortsLite</name>
-    <description>Legacy resort booking demo — Java 8 / Spring Boot 2.7.x</description>
+    <description>Resort booking demo — Java 25 / Spring Boot 3.4.x</description>
 
     <properties>
-        <java.version>1.8</java.version>
+        <!--
+            JAVA 25 UPGRADE: Updated from 1.8 to 25.
+            Rule: JAVA8_TO_25_BUILD_TOOLCHAIN, JAVA8_TO_25_LOMBOK_CONFIGURATION,
+                  JAVA8_TO_25_DEPENDENCY_UPDATES
+        -->
+        <java.version>25</java.version>
+        <!--
+            JAVA 25 UPGRADE: Use maven.compiler.release instead of source/target pair.
+            Rule: JAVA8_TO_25_BUILD_TOOLCHAIN
+        -->
+        <maven.compiler.release>25</maven.compiler.release>
     </properties>
 
     <dependencies>
@@ -30,18 +45,16 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
-        <!-- SECURITY VIOLATION: log4j 2.14.1 has critical CVE-2021-44228 (Log4Shell) -->
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-core</artifactId>
-            <version>2.14.1</version>
-        </dependency>
-        <!-- SECURITY VIOLATION: commons-collections 3.2.1 has CVE-2015-6420 (RCE) -->
-        <dependency>
-            <groupId>commons-collections</groupId>
-            <artifactId>commons-collections</artifactId>
-            <version>3.2.1</version>
-        </dependency>
+        <!--
+            JAVA 25 UPGRADE: Removed log4j-core 2.14.1 (CVE-2021-44228 Log4Shell).
+            Spring Boot 3.x uses Logback by default; explicit log4j-core is not needed.
+            If Log4j2 is required, use 2.23.1+ which is Java 25 compatible.
+        -->
+        <!--
+            JAVA 25 UPGRADE: Removed commons-collections 3.2.1 (CVE-2015-6420 RCE).
+            Rule: JAVA8_TO_25_DEPENDENCY_CONFLICTS
+            If Apache Commons Collections is needed, use commons-collections4 4.4+.
+        -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
@@ -51,6 +64,29 @@
 
     <build>
         <plugins>
+            <!--
+                JAVA 25 UPGRADE: Upgraded maven-compiler-plugin to 3.13.0 for Java 25 support.
+                Configured with release flag (not source/target) per Java 25 best practices.
+                Rule: JAVA8_TO_25_BUILD_TOOLCHAIN, JAVA8_TO_25_MAVEN_PLUGIN_UPDATES,
+                      JAVA8_TO_25_LOMBOK_CONFIGURATION
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>25</release>
+                </configuration>
+            </plugin>
+            <!--
+                JAVA 25 UPGRADE: Upgraded maven-surefire-plugin to 3.2.5 for Java 25 support.
+                Rule: JAVA8_TO_25_MAVEN_PLUGIN_UPDATES
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

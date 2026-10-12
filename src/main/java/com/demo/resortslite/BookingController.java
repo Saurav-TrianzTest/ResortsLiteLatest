@@ -3,7 +3,13 @@ package com.demo.resortslite;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpSession;
+/*
+ * JAVA 25 UPGRADE: Replaced javax.servlet.http.HttpSession with
+ * jakarta.servlet.http.HttpSession.
+ * Spring Boot 3.x / Jakarta EE 10 uses the jakarta.* namespace exclusively.
+ * Rule: JAVA8_TO_25_JAKARTA_NAMESPACE_MIGRATION, JAVA8_TO_25_JAKARTA_EE_MIGRATION
+ */
+import jakarta.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
 
