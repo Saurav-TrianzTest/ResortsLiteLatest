@@ -8,8 +8,8 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <!-- Updated from 2.7.18 to 3.3.x for Java 25 compatibility -->
-        <version>3.3.4</version>
+        <!-- Updated from 3.3.4 to 3.4.5 for Java 25 (class file major version 69) compatibility -->
+        <version>3.4.5</version>
         <relativePath/>
     </parent>
 
