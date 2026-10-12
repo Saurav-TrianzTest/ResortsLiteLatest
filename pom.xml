@@ -9,13 +9,13 @@
         JAVA 25 UPGRADE: Spring Boot 3.4.x is the minimum baseline that supports Java 25.
         Spring Boot 3.x requires Jakarta EE 10 (jakarta.* namespace) instead of javax.*.
         Rule: JAVA8_TO_25_SPRING_BOOT_BASELINE, JAVA8_TO_25_SPRING_BOOT_COMPATIBILITY
-        Previous version: 2.7.15 (incompatible with Java 25)
-        Updated version:  3.4.1  (full Java 25 + Jakarta EE 10 support)
+        Previous version: 3.4.1 (spring-boot-maven-plugin uses ASM 9.5 which does not support Java 25 class files)
+        Updated version:  3.5.0 (uses ASM 9.7 which supports Java 25 class file major version 69)
     -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.0</version>
         <relativePath/>
     </parent>
 
