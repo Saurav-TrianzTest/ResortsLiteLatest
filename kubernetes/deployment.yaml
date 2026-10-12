@@ -28,7 +28,7 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "docker"
-            # Oracle datasource — store credentials in a Kubernetes Secret
+            # PostgreSQL datasource — store credentials in a Kubernetes Secret
             - name: SPRING_DATASOURCE_URL
               value: "{{SPRING_DATASOURCE_URL}}"
             - name: SPRING_DATASOURCE_USERNAME

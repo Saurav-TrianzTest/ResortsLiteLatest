@@ -11,8 +11,8 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      # Oracle datasource — point to your external Oracle instance
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:oracle:thin:@localhost:1521:ORCL}
+      # PostgreSQL datasource — point to your PostgreSQL instance
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://localhost:5432/resortslite}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-admin}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-}
       # Redis / ElastiCache
