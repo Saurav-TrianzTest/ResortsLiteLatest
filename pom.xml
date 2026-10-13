@@ -5,12 +5,14 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- FIXED: JAVA8_TO_25_SPRING_BOOT_BASELINE — upgraded Spring Boot parent from 2.7.18
-         to 3.3.4 which supports Java 25 and uses the jakarta.* namespace -->
+    <!-- FIXED: JAVA8_TO_25_SPRING_BOOT_BASELINE - upgraded Spring Boot parent from 2.7.18
+         to 3.4.5 which supports Java 25 class files (major version 69) and uses
+         the jakarta.* namespace. Spring Boot 3.4.5 bundles spring-boot-loader-tools
+         with ASM support for Java 25. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.4</version>
+        <version>3.4.5</version>
         <relativePath/>
     </parent>
 
@@ -18,10 +20,10 @@
     <artifactId>resortsLite</artifactId>
     <version>1.0.0</version>
     <name>ResortsLite</name>
-    <description>Resort booking demo — Java 25 / Spring Boot 3.3.x</description>
+    <description>Resort booking demo - Java 25 / Spring Boot 3.4.x</description>
 
     <properties>
-        <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN — changed java.version from 1.8 to 25 -->
+        <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN - changed java.version from 1.8 to 25 -->
         <java.version>25</java.version>
     </properties>
 
@@ -39,11 +41,12 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- FIXED: log4j upgraded from 2.14.1 (CVE-2021-44228 Log4Shell) to 2.23.1 -->
+        <!-- FIXED: log4j upgraded from 2.14.1 (CVE-2021-44228 Log4Shell) to 2.24.3
+             (managed by Spring Boot 3.4.5 BOM). Explicit version overrides BOM minimum. -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.23.1</version>
+            <version>2.24.3</version>
         </dependency>
 
         <!-- FIXED: commons-collections upgraded from 3.2.1 (CVE-2015-6420 RCE) to 3.2.2 -->
@@ -74,14 +77,14 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- H2 for local/test use — version managed by Spring Boot BOM -->
+        <!-- H2 for local/test use - version managed by Spring Boot BOM -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Spring Boot test starter — version managed by Spring Boot BOM -->
+        <!-- Spring Boot test starter - version managed by Spring Boot BOM -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -92,7 +95,7 @@
     <build>
         <plugins>
             <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN / JAVA8_TO_25_MAVEN_PLUGIN_UPDATES
-                 — explicit maven-compiler-plugin 3.13.0 with release=25 replaces
+                 - explicit maven-compiler-plugin 3.13.0 with release=25 replaces
                    the old source/target=1.8 pair -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -105,7 +108,7 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
-            <!-- FIXED: JAVA8_TO_25_MAVEN_PLUGIN_UPDATES — surefire 3.2.5 supports Java 25 -->
+            <!-- FIXED: JAVA8_TO_25_MAVEN_PLUGIN_UPDATES - surefire 3.2.5 supports Java 25 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -117,7 +120,7 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN — pass --enable-preview at runtime
+                <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN - pass enable-preview at runtime
                      so preview features compiled with release=25 work when running via
                      spring-boot:run or the packaged fat-jar on Java 25. -->
                 <configuration>
