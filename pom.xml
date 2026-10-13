@@ -23,10 +23,10 @@
     <description>Resort booking demo - Java 25 / Spring Boot 3.4.x</description>
 
     <properties>
-        <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN - target version is 25;
-             build environment uses Java 17 (available JDK), so release is set to 17
-             for CI/test compatibility while preserving the Java 25 target intent. -->
-        <java.version>17</java.version>
+        <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN - target version is 25 -->
+        <java.version>25</java.version>
+        <!-- Override byte-buddy version to support Java 25 (class file major version 69) -->
+        <byte-buddy.version>1.15.11</byte-buddy.version>
     </properties>
 
     <dependencies>
@@ -111,27 +111,37 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Byte Buddy agent - needed for Mockito inline mocking on Java 25 -->
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <version>${byte-buddy.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- Compiler plugin using Java 17 (available JDK) -->
+            <!-- Compiler plugin using Java 25 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <release>17</release>
+                    <release>25</release>
                 </configuration>
             </plugin>
 
-            <!-- Surefire plugin for running JUnit 5 tests -->
+            <!-- Surefire plugin for running JUnit 5 tests with Java 25 support -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>@{argLine}</argLine>
+                    <!-- Enable Byte Buddy experimental mode for Java 25 support in Mockito -->
+                    <!-- Also pass JaCoCo argLine via @{argLine} placeholder -->
+                    <argLine>@{argLine} -Dnet.bytebuddy.experimental=true -XX:+EnableDynamicAgentLoading</argLine>
                 </configuration>
             </plugin>
 
@@ -141,11 +151,11 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
 
-            <!-- JaCoCo for code coverage reporting -->
+            <!-- JaCoCo 0.8.13 for code coverage reporting - supports Java 25 (class file major version 69) -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.11</version>
+                <version>0.8.13</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
