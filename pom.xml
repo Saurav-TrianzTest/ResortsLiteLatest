@@ -5,20 +5,23 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- FIXED: JAVA8_TO_25_SPRING_BOOT_BASELINE — upgraded Spring Boot parent from 2.7.18
+         to 3.3.4 which supports Java 25 and uses the jakarta.* namespace -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.3.4</version>
     </parent>
 
     <groupId>com.demo</groupId>
     <artifactId>resortsLite</artifactId>
     <version>1.0.0</version>
     <name>ResortsLite</name>
-    <description>Legacy resort booking demo — Java 8 / Spring Boot 2.7.x</description>
+    <description>Resort booking demo — Java 25 / Spring Boot 3.3.x</description>
 
     <properties>
-        <java.version>1.8</java.version>
+        <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN — changed java.version from 1.8 to 25 -->
+        <java.version>25</java.version>
     </properties>
 
     <dependencies>
@@ -34,22 +37,25 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- SECURITY VIOLATION: log4j 2.14.1 has critical CVE-2021-44228 (Log4Shell) -->
+
+        <!-- FIXED: log4j upgraded from 2.14.1 (CVE-2021-44228 Log4Shell) to 2.23.1 -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.14.1</version>
+            <version>2.23.1</version>
         </dependency>
-        <!-- SECURITY VIOLATION: commons-collections 3.2.1 has CVE-2015-6420 (RCE) -->
+
+        <!-- FIXED: commons-collections upgraded from 3.2.1 (CVE-2015-6420 RCE) to 3.2.2 -->
         <dependency>
             <groupId>commons-collections</groupId>
             <artifactId>commons-collections</artifactId>
-            <version>3.2.1</version>
+            <version>3.2.2</version>
         </dependency>
-        <!-- Oracle JDBC (Java 8) — version managed by Spring Boot 2.7 BOM -->
+
+        <!-- Oracle JDBC — version managed by Spring Boot 3.3 BOM -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc8</artifactId>
+            <artifactId>ojdbc11</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -71,6 +77,29 @@
 
     <build>
         <plugins>
+            <!-- FIXED: JAVA8_TO_25_BUILD_TOOLCHAIN / JAVA8_TO_25_MAVEN_PLUGIN_UPDATES
+                 — explicit maven-compiler-plugin 3.13.0 with release=25 replaces
+                   the old source/target=1.8 pair -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>25</release>
+                    <compilerArgs>
+                        <arg>--enable-preview</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <!-- FIXED: JAVA8_TO_25_MAVEN_PLUGIN_UPDATES — surefire 3.2.5 supports Java 25 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <argLine>--enable-preview</argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

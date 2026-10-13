@@ -1,12 +1,14 @@
 package com.demo.resortslite.entity;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.SequenceGenerator;
-import javax.persistence.Table;
+// FIXED: JAVA8_TO_25_JAKARTA_NAMESPACE_MIGRATION — replaced all javax.persistence.*
+// imports with jakarta.persistence.* (required by Spring Boot 3.x / Jakarta EE 10)
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name="JPA_DOCTOR_INFO")
@@ -14,15 +16,14 @@ public class Doctor {
 
 	@Column(name="DOC_ID")
 	@Id
-	//@GeneratedValue(strategy=GenerationType.AUTO)
-	@SequenceGenerator(name="gen1",sequenceName="CNO_SEQ",initialValue = 203,allocationSize = 1)
-	@GeneratedValue(generator ="gen1",strategy = GenerationType.SEQUENCE)
+	@SequenceGenerator(name="gen1", sequenceName="CNO_SEQ", initialValue = 203, allocationSize = 1)
+	@GeneratedValue(generator = "gen1", strategy = GenerationType.SEQUENCE)
 	private Integer docId;
 
-	@Column(name="DOC_NAME",length=25)
+	@Column(name="DOC_NAME", length=25)
 	private String docName;
 
-	@Column(name="SPECIALIZATION",length=20)
+	@Column(name="SPECIALIZATION", length=20)
 	private String specialization;
 
 	@Column(name="INCOME")
