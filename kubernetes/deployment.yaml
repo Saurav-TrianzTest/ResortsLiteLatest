@@ -30,7 +30,7 @@ spec:
               value: "docker"
             - name: TZ
               value: "UTC"
-            # Oracle datasource
+            # PostgreSQL datasource
             - name: SPRING_DATASOURCE_URL
               value: "{{SPRING_DATASOURCE_URL}}"
             - name: SPRING_DATASOURCE_USERNAME
