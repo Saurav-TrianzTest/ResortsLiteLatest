@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  resortsLite:
+    image: resortsLite:latest
+    container_name: resortsLite-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      # Oracle datasource — supply real values via .env file or shell exports
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:oracle:thin:@localhost:1521:ORCL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-admin}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-changeme}
+      # Redis / ElastiCache
+      REDIS_HOST: ${REDIS_HOST:-localhost}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-30}
+      # Internal service endpoints
+      APP_PAYMENT_ENDPOINT: ${APP_PAYMENT_ENDPOINT:-http://payment-svc:9090/charge}
+      APP_INVENTORY_ENDPOINT: ${APP_INVENTORY_ENDPOINT:-http://inventory-svc:8081/rooms}
+      APP_NOTIFICATION_ENDPOINT: ${APP_NOTIFICATION_ENDPOINT:-http://notify-svc:7070/send}
+      # Report storage
+      REPORT_BASE_PATH: ${REPORT_BASE_PATH:-/var/reports}
+      # JVM options
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+    volumes:
+      - reports-data:/var/reports
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  reports-data:
+
+networks:
+  app-network:
+    driver: bridge
