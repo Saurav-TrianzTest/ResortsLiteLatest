@@ -1,11 +1,15 @@
 package com.demo.resortslite;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+// cr-java-0065: HttpSession import removed — session state is now stored in GCP Memorystore
+// for Redis via RedisTemplate, enabling stateless horizontal scaling across all instances.
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -14,9 +18,23 @@ public class BookingController {
     @Autowired
     private BookingService bookingService;
 
-    // VIOLATION cr-java-0067 [Cloud Compatibility / Mandatory]: In-memory cache without TTL
-    // breaks horizontal scaling — cache is instance-local, invisible to other EC2 instances
-    private static final Map<String, Object> bookingCache = new HashMap<>(); // cr-java-0067
+    // cr-java-0065: RedisTemplate replaces HttpSession for distributed session state storage.
+    // All session attributes are persisted in GCP Memorystore for Redis so that any instance
+    // in the cluster can read them, eliminating server affinity and supporting auto-scaling.
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    // cr-java-0067 FIX: Removed static in-memory HashMap bookingCache (was unbounded, instance-local,
+    // and had no TTL). Booking cache entries are now stored in GCP Memorystore for Redis via
+    // RedisTemplate with a configurable TTL (BOOKING_CACHE_TTL_SECONDS), ensuring consistent
+    // cache state across all instances and preventing memory exhaustion.
+
+    // Session TTL: 30 minutes — aligns with spring.session.timeout in application.properties
+    private static final long SESSION_TTL_SECONDS = 1800L;
+
+    // cr-java-0067: Booking cache TTL — 60 minutes default. Entries expire automatically,
+    // preventing stale data and unbounded memory growth in GCP Memorystore for Redis.
+    private static final long BOOKING_CACHE_TTL_SECONDS = 3600L;
 
     @PostMapping("/create")
     public Map<String, Object> createBooking(
@@ -24,17 +42,29 @@ public class BookingController {
             @RequestParam String roomType,
             @RequestParam String checkIn,
             @RequestParam String checkOut,
-            HttpSession session) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
 
         Map<String, Object> booking = bookingService.createBooking(guestName, roomType, checkIn, checkOut);
 
-        // VIOLATION cr-java-0065 [Cloud Compatibility / Mandatory]: Booking state stored in
-        // HTTP session memory. AWS ALB distributes requests across EC2 instances — session
-        // data on instance A is invisible to instance B. Auto-scaling and failover breaks.
-        session.setAttribute("lastBooking", booking); // cr-java-0065
-        session.setAttribute("guestName", guestName); // cr-java-0065
+        // cr-java-0065 FIX (Lines 34-35): Session attributes previously stored in HttpSession
+        // are now written to GCP Memorystore for Redis via RedisTemplate.  Each key is
+        // namespaced by sessionId so multiple concurrent users remain isolated.  A TTL of
+        // SESSION_TTL_SECONDS is applied to prevent stale data accumulation.
+        if (sessionId != null && !sessionId.isEmpty()) {
+            String lastBookingKey = "session:" + sessionId + ":lastBooking";
+            String guestNameKey   = "session:" + sessionId + ":guestName";
+            redisTemplate.opsForValue().set(lastBookingKey, booking,       SESSION_TTL_SECONDS, TimeUnit.SECONDS);
+            redisTemplate.opsForValue().set(guestNameKey,   guestName,     SESSION_TTL_SECONDS, TimeUnit.SECONDS);
+        }
 
-        bookingCache.put((String) booking.get("bookingId"), booking);
+        // cr-java-0067 FIX: Booking is now cached in GCP Memorystore for Redis with a TTL of
+        // BOOKING_CACHE_TTL_SECONDS (3600 s). This replaces the former static HashMap which
+        // was instance-local, had no expiration, and caused stale data across scaled instances.
+        String bookingId = (String) booking.get("bookingId");
+        if (bookingId != null) {
+            String bookingCacheKey = "cache:booking:" + bookingId;
+            redisTemplate.opsForValue().set(bookingCacheKey, booking, BOOKING_CACHE_TTL_SECONDS, TimeUnit.SECONDS);
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "confirmed");
@@ -45,16 +75,29 @@ public class BookingController {
     @GetMapping("/status/{bookingId}")
     public Map<String, Object> getBookingStatus(
             @PathVariable String bookingId,
-            HttpSession session) {
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId) {
 
-        // VIOLATION cr-java-0065 [Cloud Compatibility / Mandatory]: Reading business state
-        // from HTTP session — will return null on any other instance in the cluster.
-        String lastGuest = (String) session.getAttribute("guestName"); // cr-java-0065
+        // cr-java-0065 FIX (Line 48): Session attribute previously read from HttpSession is
+        // now retrieved from GCP Memorystore for Redis via RedisTemplate.  Because Redis is
+        // a shared, external store, the value is visible to every instance in the cluster —
+        // eliminating the data-loss that occurred when ALB/Cloud Load Balancer routed the
+        // request to a different instance than the one that created the session.
+        String lastGuest = null;
+        if (sessionId != null && !sessionId.isEmpty()) {
+            String guestNameKey = "session:" + sessionId + ":guestName";
+            lastGuest = (String) redisTemplate.opsForValue().get(guestNameKey);
+        }
+
+        // cr-java-0067 FIX: Booking details are now read from the Redis-backed cache
+        // (GCP Memorystore) instead of the former instance-local static HashMap.
+        // Cache miss falls back to bookingService.getBookingById() transparently.
+        String bookingCacheKey = "cache:booking:" + bookingId;
+        Object cachedBooking = redisTemplate.opsForValue().get(bookingCacheKey);
 
         Map<String, Object> result = new HashMap<>();
         result.put("bookingId", bookingId);
         result.put("sessionGuest", lastGuest);
-        result.put("details", bookingService.getBookingById(bookingId));
+        result.put("details", cachedBooking != null ? cachedBooking : bookingService.getBookingById(bookingId));
         return result;
     }
 

@@ -67,6 +67,38 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Google Cloud Storage SDK — replaces hard-coded local file paths (cr-java-0061) -->
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-storage</artifactId>
+            <version>2.29.1</version>
+        </dependency>
+        <!-- cr-java-0069: Spring Cloud GCP Secret Manager — replaces hard-coded DB credentials.
+             Credentials (db-host, db-username, db-password) are resolved at runtime from
+             Google Secret Manager using the sm:// URI scheme, enabling rotation without
+             redeployment and preventing credential exposure in version control. -->
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>spring-cloud-gcp-starter-secretmanager</artifactId>
+            <version>1.2.8.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-context</artifactId>
+            <version>3.1.7</version>
+        </dependency>
+        <!-- cr-java-0065: Spring Session Data Redis — replaces HttpSession with centralized
+             Redis-backed session storage on GCP Memorystore for Redis, enabling stateless
+             horizontal scaling across multiple instances without server affinity. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        <!-- Lettuce Redis client used by Spring Session / Spring Data Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
