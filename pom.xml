@@ -34,6 +34,29 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+
+        <!-- cz-java-0063 FIX: Spring Session Data Redis — externalises HttpSession to
+             Amazon ElastiCache (Redis) so all EKS pods share session state.
+             @EnableRedisHttpSession in RedisSessionConfig activates this. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+
+        <!-- cz-java-0063 FIX: Spring Boot Redis starter (Lettuce client) — provides
+             RedisConnectionFactory and auto-configuration for ElastiCache connectivity. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!-- health-check-endpoint: Spring Boot Actuator — exposes /actuator/health
+             endpoint required for EKS liveness/readiness probes. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- SECURITY VIOLATION: log4j 2.14.1 has critical CVE-2021-44228 (Log4Shell) -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
