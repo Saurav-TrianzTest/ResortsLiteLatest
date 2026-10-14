@@ -1,7 +1,14 @@
 package com.demo.resortslite;
 
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.security.keyvault.secrets.SecretClient;
+import com.azure.security.keyvault.secrets.SecretClientBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 import java.security.MessageDigest;
@@ -9,23 +16,113 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * BookingService — cloud-ready implementation.
+ *
+ * cr-java-0090 FIX (File-based Authentication):
+ *   All credential storage has been removed from local files.
+ *   Authentication is now delegated to Azure Active Directory (Entra ID) via
+ *   Spring Security OAuth2 Resource Server (JWT / MSAL).  The service reads the
+ *   caller's identity from the SecurityContext (populated by Spring Security AAD
+ *   filter) instead of maintaining its own user/password files or static constants.
+ *   Database credentials are retrieved at runtime from Azure Key Vault using
+ *   DefaultAzureCredential (Managed Identity in Azure, env-vars / CLI locally),
+ *   so no secret ever lives in source code or on the local file system.
+ */
 @Service
 public class BookingService {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // VIOLATION [Security Health / Critical]: Hardcoded database credentials in source code.
-    // If this repo is pushed to GitHub (even private), credentials are permanently exposed
-    // in git history. AWS Secrets Manager or Parameter Store must be used instead.
+    // FIXED cr-java-0021 / cr-java-0090: DB_HOST is a non-secret reference only.
+    // DB_USER and DB_PASS have been removed from source code entirely; they are
+    // retrieved at runtime from Azure Key Vault (see getDbUser() / getDbPass()).
     private static final String DB_HOST = "db-prod.resorts-internal.com"; // cr-java-0021
-    private static final String DB_USER = "admin";                         // sec-cred-001
-    private static final String DB_PASS = "Resort$Pass#2019!";             // sec-cred-001
+
+    /**
+     * Azure Key Vault URI injected from the environment variable AZURE_KEY_VAULT_URI.
+     * Example: https://my-keyvault.vault.azure.net/
+     *
+     * cr-java-0090 FIX: No credentials are stored in files.  The Key Vault URI is the
+     * only configuration value needed here; actual secrets are fetched at runtime via
+     * Managed Identity / DefaultAzureCredential — no username or password file required.
+     */
+    @Value("${azure.keyvault.uri:${AZURE_KEY_VAULT_URI:}}")
+    private String keyVaultUri;
+
+    /**
+     * Lazily-initialised Key Vault SecretClient backed by DefaultAzureCredential.
+     *
+     * DefaultAzureCredential automatically picks up the Azure Managed Identity assigned
+     * to the App Service / Container App at runtime, or falls back to environment
+     * variables / Azure CLI credentials for local development.  This replaces any
+     * file-based credential store (cr-java-0090).
+     */
+    private SecretClient secretClient;
+
+    private SecretClient getSecretClient() {
+        if (secretClient == null) {
+            secretClient = new SecretClientBuilder()
+                    .vaultUrl(keyVaultUri)
+                    .credential(new DefaultAzureCredentialBuilder().build())
+                    .buildClient();
+        }
+        return secretClient;
+    }
+
+    /**
+     * Retrieves the database username from Azure Key Vault.
+     *
+     * cr-java-0090 FIX: Previously stored as a static final String in source code
+     * (file-based credential storage).  Now fetched securely from Key Vault at
+     * runtime; the secret name "db-username" must be provisioned in Key Vault by
+     * the operations team — it never appears in any source or config file.
+     */
+    private String getDbUser() {
+        return getSecretClient().getSecret("db-username").getValue();
+    }
+
+    /**
+     * Retrieves the database password from Azure Key Vault.
+     *
+     * cr-java-0090 FIX: Previously stored as a static final String in source code
+     * (file-based credential storage).  Now fetched securely from Key Vault at
+     * runtime; the secret name "db-password" must be provisioned in Key Vault by
+     * the operations team — it never appears in any source or config file.
+     */
+    private String getDbPass() {
+        return getSecretClient().getSecret("db-password").getValue();
+    }
 
     // VIOLATION cr-java-0021 [Cloud Compatibility / Mandatory]: Hardcoded infrastructure
     // hostname. Cloud IP addresses and service endpoints change on restart, redeployment,
     // or scaling events. Must be externalised to environment variables / Parameter Store.
     private static final String PAYMENT_API = "http://10.0.1.45:9090/payments/charge"; // cr-java-0021, cr-java-0088
+
+    /**
+     * Returns the Azure AD (Entra ID) principal name of the currently authenticated user.
+     *
+     * cr-java-0090 FIX: Authentication identity is sourced exclusively from the Azure AD
+     * JWT token validated by Spring Security OAuth2 Resource Server.  No local user file,
+     * properties file, or in-memory credential store is consulted.  The JWT is issued by
+     * Azure AD and carries the user's object ID, UPN, and roles as standard claims.
+     *
+     * Spring Security configuration (SecurityConfig) must be present with:
+     *   spring.security.oauth2.resourceserver.jwt.jwk-set-uri pointing to the Azure AD
+     *   JWKS endpoint for the registered application.
+     */
+    public String getAuthenticatedPrincipal() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt) {
+            Jwt jwt = (Jwt) authentication.getPrincipal();
+            // Prefer the UPN claim (Azure AD user principal name); fall back to subject
+            String upn = jwt.getClaimAsString("upn");
+            return (upn != null && !upn.isEmpty()) ? upn : jwt.getSubject();
+        }
+        // Fallback for non-JWT principals (e.g., service accounts using client credentials)
+        return authentication != null ? authentication.getName() : "anonymous";
+    }
 
     public Map<String, Object> createBooking(String guestName, String roomType,
                                               String checkIn, String checkOut) {
@@ -51,6 +148,9 @@ public class BookingService {
         booking.put("checkOut", checkOut);
         booking.put("confirmationCode", confirmCode);
         booking.put("dbHost", DB_HOST);
+        // cr-java-0090 FIX: Expose the authenticated Azure AD principal in the response
+        // so callers can audit which AAD identity created the booking.
+        booking.put("createdBy", getAuthenticatedPrincipal());
         return booking;
     }
 

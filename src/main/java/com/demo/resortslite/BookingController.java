@@ -1,11 +1,12 @@
 package com.demo.resortslite;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/bookings")
@@ -14,47 +15,65 @@ public class BookingController {
     @Autowired
     private BookingService bookingService;
 
-    // VIOLATION cr-java-0067 [Cloud Compatibility / Mandatory]: In-memory cache without TTL
-    // breaks horizontal scaling — cache is instance-local, invisible to other EC2 instances
-    private static final Map<String, Object> bookingCache = new HashMap<>(); // cr-java-0067
+    // cr-java-0065 FIX: RedisTemplate replaces HttpSession for distributed session state.
+    // Azure Cache for Redis stores session data externally, enabling stateless horizontal
+    // scaling across multiple application instances without server affinity.
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    // cr-java-0067 FIX: Removed static in-memory bookingCache (HashMap without TTL).
+    // All cache operations now use Azure Cache for Redis via RedisTemplate with explicit
+    // TTL policies, ensuring distributed cache consistency across all application instances,
+    // preventing memory exhaustion, and eliminating stale data across cloud nodes.
 
     @PostMapping("/create")
     public Map<String, Object> createBooking(
             @RequestParam String guestName,
             @RequestParam String roomType,
             @RequestParam String checkIn,
-            @RequestParam String checkOut,
-            HttpSession session) {
+            @RequestParam String checkOut) {
 
         Map<String, Object> booking = bookingService.createBooking(guestName, roomType, checkIn, checkOut);
 
-        // VIOLATION cr-java-0065 [Cloud Compatibility / Mandatory]: Booking state stored in
-        // HTTP session memory. AWS ALB distributes requests across EC2 instances — session
-        // data on instance A is invisible to instance B. Auto-scaling and failover breaks.
-        session.setAttribute("lastBooking", booking); // cr-java-0065
-        session.setAttribute("guestName", guestName); // cr-java-0065
+        // cr-java-0065 FIX: Booking state stored in Azure Cache for Redis instead of
+        // HTTP session memory. Redis is shared across all application instances, so
+        // Azure Load Balancer can route requests to any instance without data loss.
+        String bookingId = (String) booking.get("bookingId");
+        redisTemplate.opsForValue().set("session:lastBooking:" + bookingId, booking, 30, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set("session:guestName:" + bookingId, guestName, 30, TimeUnit.MINUTES);
 
-        bookingCache.put((String) booking.get("bookingId"), booking);
+        // cr-java-0067 FIX: Booking data cached in Azure Cache for Redis with a 60-minute TTL.
+        // Replaces the former static HashMap (bookingCache) which had no expiration policy,
+        // caused unbounded memory growth, and was invisible to other cloud instances.
+        // Redis provides a shared, distributed cache with automatic key expiration across
+        // all horizontally scaled application instances.
+        redisTemplate.opsForValue().set("cache:booking:" + bookingId, booking, 60, TimeUnit.MINUTES);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "confirmed");
         response.put("booking", booking);
+        response.put("sessionKey", bookingId);
         return response;
     }
 
     @GetMapping("/status/{bookingId}")
     public Map<String, Object> getBookingStatus(
-            @PathVariable String bookingId,
-            HttpSession session) {
+            @PathVariable String bookingId) {
 
-        // VIOLATION cr-java-0065 [Cloud Compatibility / Mandatory]: Reading business state
-        // from HTTP session — will return null on any other instance in the cluster.
-        String lastGuest = (String) session.getAttribute("guestName"); // cr-java-0065
+        // cr-java-0065 FIX: Reading business state from Azure Cache for Redis instead of
+        // HTTP session — Redis is accessible from every instance in the cluster, so
+        // any node can serve this request regardless of which instance handled the original booking.
+        String lastGuest = (String) redisTemplate.opsForValue().get("session:guestName:" + bookingId);
+
+        // cr-java-0067 FIX: Booking lookup served from Azure Cache for Redis distributed cache.
+        // Falls back to the booking service if the cache entry has expired (TTL elapsed),
+        // ensuring correctness without relying on instance-local in-memory state.
+        Object cachedBooking = redisTemplate.opsForValue().get("cache:booking:" + bookingId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("bookingId", bookingId);
         result.put("sessionGuest", lastGuest);
-        result.put("details", bookingService.getBookingById(bookingId));
+        result.put("details", cachedBooking != null ? cachedBooking : bookingService.getBookingById(bookingId));
         return result;
     }
 
