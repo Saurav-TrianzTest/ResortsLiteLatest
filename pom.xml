@@ -5,12 +5,13 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- UPGRADED: Spring Boot 3.4.x is the minimum baseline that supports Java 25.
-         Spring Boot 2.7.x targets Java 8/11/17 and cannot run on Java 25. -->
+    <!-- UPGRADED: Spring Boot 3.5.x is the minimum baseline that supports Java 25.
+         Spring Boot 3.4.x spring-boot-maven-plugin cannot repackage Java 25 class files (version 69).
+         Spring Boot 3.5.x includes an updated spring-boot-maven-plugin with Java 25 support. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.1</version>
+        <version>3.5.3</version>
     </parent>
 
     <groupId>com.demo</groupId>
@@ -87,7 +88,7 @@
     <build>
         <plugins>
             <!-- UPGRADED: maven-compiler-plugin 3.13.0 supports Java 25 compilation.
-                 Older versions bundled with Spring Boot 2.7 do not understand --release 25. -->
+                 Older versions bundled with Spring Boot 2.7 do not understand -release 25. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
