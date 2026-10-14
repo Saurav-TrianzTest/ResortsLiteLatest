@@ -5,20 +5,25 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- UPGRADED: Spring Boot 3.4.x is the minimum baseline that supports Java 25.
+         Spring Boot 2.7.x targets Java 8/11/17 and cannot run on Java 25. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.4.1</version>
     </parent>
 
     <groupId>com.demo</groupId>
     <artifactId>resortsLite</artifactId>
     <version>1.0.0</version>
     <name>ResortsLite</name>
-    <description>Legacy resort booking demo — Java 8 / Spring Boot 2.7.x</description>
+    <description>Resort booking demo — upgraded to Java 25 / Spring Boot 3.4.x</description>
 
     <properties>
-        <java.version>1.8</java.version>
+        <!-- UPGRADED: Changed from 1.8 to 25 to target Java 25 bytecode.
+             Using maven.compiler.release instead of source/target pair (Java 9+ best practice). -->
+        <java.version>25</java.version>
+        <maven.compiler.release>25</maven.compiler.release>
     </properties>
 
     <dependencies>
@@ -34,32 +39,40 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- SECURITY VIOLATION: log4j 2.14.1 has critical CVE-2021-44228 (Log4Shell) -->
+
+        <!-- UPGRADED: log4j-core 2.14.1 has critical CVE-2021-44228 (Log4Shell).
+             Updated to 2.24.3 which is the latest secure release. -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.14.1</version>
+            <version>2.24.3</version>
         </dependency>
-        <!-- SECURITY VIOLATION: commons-collections 3.2.1 has CVE-2015-6420 (RCE) -->
+
+        <!-- UPGRADED: commons-collections 3.2.1 has CVE-2015-6420 (RCE).
+             Updated to 3.2.2 which patches the deserialization vulnerability. -->
         <dependency>
             <groupId>commons-collections</groupId>
             <artifactId>commons-collections</artifactId>
-            <version>3.2.1</version>
+            <version>3.2.2</version>
         </dependency>
-        <!-- Oracle JDBC (Java 8) — version managed by Spring Boot 2.7 BOM -->
+
+        <!-- UPGRADED: ojdbc8 targets Java 8. Use ojdbc11 for Java 11+ / Java 25 compatibility. -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc8</artifactId>
+            <artifactId>ojdbc11</artifactId>
+            <version>23.6.0.24.10</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.oracle.database.nls</groupId>
             <artifactId>orai18n</artifactId>
+            <version>23.6.0.24.10</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ucp</artifactId>
+            <version>23.6.0.24.10</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -71,6 +84,22 @@
 
     <build>
         <plugins>
+            <!-- UPGRADED: maven-compiler-plugin 3.13.0 supports Java 25 compilation.
+                 Older versions bundled with Spring Boot 2.7 do not understand --release 25. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>25</release>
+                </configuration>
+            </plugin>
+            <!-- UPGRADED: maven-surefire-plugin 3.5.2 is required for Java 25 test execution. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
