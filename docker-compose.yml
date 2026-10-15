@@ -20,7 +20,7 @@ services:
       # Booking cache TTL
       - BOOKING_CACHE_TTL_SECONDS=${BOOKING_CACHE_TTL_SECONDS:-3600}
       # Database connection — provide actual values at runtime
-      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:oracle:thin:@localhost:1521:ORCL}
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:postgresql://localhost:5432/orcl}
       - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-admin}
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-}
       # Internal service endpoints
