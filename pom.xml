@@ -19,9 +19,55 @@
 
     <properties>
         <java.version>1.8</java.version>
+        <!-- AWS SDK for Java v2 BOM version — used for S3 object storage (cr-java-0061 fix) -->
+        <aws.sdk.version>2.25.40</aws.sdk.version>
     </properties>
 
+    <!-- cr-java-0065 FIX: Spring Session Data Redis — stores HTTP session in Amazon
+         ElastiCache for Redis instead of local JVM heap, enabling stateless instances
+         and correct behaviour behind AWS ALB with multiple EC2 instances. -->
+
     <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        <!-- AWS SDK for Java v2 S3 — replaces hard-coded local file paths (cr-java-0061) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK URL connection client required by SDK v2 -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK Cognito Identity Provider — replaces file-based authentication (cr-java-0090) -->
+        <!-- Amazon Cognito User Pools provide centralised, encrypted, and auditable user identity -->
+        <!-- management with built-in lifecycle management (sign-up, sign-in, MFA, password policies) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK SSM — retrieves environment-specific URLs from Parameter Store (cr-java-0071) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ssm</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK URL connection client required by SDK v2 -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
