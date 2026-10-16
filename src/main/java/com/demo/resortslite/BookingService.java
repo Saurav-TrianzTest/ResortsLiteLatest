@@ -4,7 +4,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+// FIXED: JAVA8_TO_21_SECURITY_CHANGES — removed MD5 (broken hash, RFC 6151) and
+// replaced with SHA-256 via MessageDigest. MD5 is flagged by the security rule
+// JAVA8_TO_21_SECURITY_CHANGES as a deprecated/weak algorithm that must not be used
+// for any security-related hashing when targeting Java 21.
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -39,9 +44,11 @@ public class BookingService {
                 + "', '" + checkIn + "', '" + checkOut + "')";                     // sql-inject-001
         jdbcTemplate.execute(sql);
 
-        // VIOLATION [Security Health / High]: MD5 is a broken hash algorithm (RFC 6151).
-        // Do not use MD5 for any security-related hashing. Use SHA-256 or bcrypt.
-        String confirmCode = md5Hash(bookingId + guestName); // sec-weak-hash-001
+        // FIXED: JAVA8_TO_21_SECURITY_CHANGES — replaced md5Hash() with sha256Hash().
+        // MD5 is a broken algorithm (RFC 6151) and is flagged by the upgrade rules as
+        // a security issue when migrating to Java 21. SHA-256 is the minimum acceptable
+        // algorithm for confirmation-code generation.
+        String confirmCode = sha256Hash(bookingId + guestName);
 
         Map<String, Object> booking = new HashMap<>();
         booking.put("bookingId", bookingId);
@@ -103,15 +110,21 @@ public class BookingService {
         return "Report generation triggered for: " + month + " via " + PAYMENT_API;
     }
 
-    private String md5Hash(String input) { // sec-weak-hash-001
+    /**
+     * FIXED: JAVA8_TO_21_SECURITY_CHANGES — replaced the former md5Hash() helper with
+     * sha256Hash(). SHA-256 is a cryptographically strong algorithm and is not flagged
+     * by the Java 8→21 security rules. The byte-to-hex conversion is unchanged.
+     */
+    private String sha256Hash(String input) {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5"); // sec-weak-hash-001
-            byte[] hash = md.digest(input.getBytes());
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : hash) { sb.append(String.format("%02x", b)); }
             return sb.toString();
-        } catch (Exception e) {
-            return input;
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 is guaranteed to be available in every Java SE implementation
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
         }
     }
 }
