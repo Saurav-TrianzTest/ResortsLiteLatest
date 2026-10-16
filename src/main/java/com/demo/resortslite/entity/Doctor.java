@@ -1,12 +1,15 @@
 package com.demo.resortslite.entity;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.SequenceGenerator;
-import javax.persistence.Table;
+// MIGRATED: javax.persistence.* replaced with jakarta.persistence.* (Java 25 / Spring Boot 3.x).
+// Spring Boot 3.x uses the Jakarta EE 10 namespace. The javax.persistence.* packages were
+// removed from the JDK and are no longer available on a Jakarta-based runtime.
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name="JPA_DOCTOR_INFO")

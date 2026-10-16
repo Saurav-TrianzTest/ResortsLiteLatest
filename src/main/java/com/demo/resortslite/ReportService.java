@@ -5,8 +5,9 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,7 +40,12 @@ public class ReportService {
                 reportDir.mkdirs();
             }
 
-            FileWriter writer = new FileWriter(fullPath);
+            // UPGRADED: FileWriter now uses explicit StandardCharsets.UTF_8 charset.
+            // Java 18+ defaults to UTF-8, but Java 8 used the platform default charset
+            // (often windows-1252 on Windows). Naming the charset explicitly ensures
+            // deterministic file encoding across all environments and JDK versions
+            // (rule JAVA8_TO_25_UTF8_DEFAULT_CHARSET).
+            FileWriter writer = new FileWriter(fullPath, StandardCharsets.UTF_8);
             writer.write("BookingID,GuestName,RoomType,CheckIn,CheckOut,Amount\n");
             writer.write("BK-001,John Smith,SUITE,2024-03-01,2024-03-05,1750.00\n");
             writer.write("BK-002,Jane Doe,DELUXE,2024-03-03,2024-03-07,960.00\n");
@@ -67,7 +73,12 @@ public class ReportService {
     }
 
     public Map<String, Object> getSystemInfo() { // doc-missing-001
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        // UPGRADED: Replaced deprecated java.util.Date + SimpleDateFormat with java.time API.
+        // java.util.Date and SimpleDateFormat are not thread-safe and are legacy APIs.
+        // java.time.LocalDateTime + DateTimeFormatter is the standard replacement since Java 8
+        // and remains the recommended approach on Java 25 (rule JAVA8_TO_25_DATE_TIME_CHANGES).
+        String timestamp = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         Map<String, Object> info = new HashMap<>();
         info.put("reportPath", REPORT_BASE_PATH);  // czr-java-001
         info.put("backupPath", BACKUP_PATH);        // czr-java-001

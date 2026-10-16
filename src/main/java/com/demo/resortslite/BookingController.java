@@ -3,7 +3,10 @@ package com.demo.resortslite;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpSession;
+// MIGRATED: javax.servlet.http.HttpSession replaced with jakarta.servlet.http.HttpSession.
+// Spring Boot 3.x / Java 25 uses the Jakarta EE 10 namespace. The javax.servlet.* packages
+// are no longer available on a Jakarta-based runtime and cause compilation failures.
+import jakarta.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
 

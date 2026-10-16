@@ -5,20 +5,27 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- UPGRADED: Spring Boot 3.3.x is the minimum baseline that supports Java 25.
+         Spring Boot 2.7.x targets Java 8/11/17 and cannot run on Java 25. -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.3.4</version>
     </parent>
 
     <groupId>com.demo</groupId>
     <artifactId>resortsLite</artifactId>
     <version>1.0.0</version>
     <name>ResortsLite</name>
-    <description>Legacy resort booking demo — Java 8 / Spring Boot 2.7.x</description>
+    <description>Resort booking demo — upgraded to Java 25 / Spring Boot 3.3.x</description>
 
     <properties>
-        <java.version>1.8</java.version>
+        <!-- UPGRADED: java.version changed from 1.8 to 25 to target Java 25 bytecode.
+             The old value caused the compiler to emit Java 8 bytecode even on a Java 25 JDK. -->
+        <java.version>25</java.version>
+        <!-- UPGRADED: Use maven.compiler.release instead of source/target pair.
+             The release flag enforces the API surface of the target JDK. -->
+        <maven.compiler.release>25</maven.compiler.release>
     </properties>
 
     <dependencies>
@@ -34,32 +41,41 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- SECURITY VIOLATION: log4j 2.14.1 has critical CVE-2021-44228 (Log4Shell) -->
+
+        <!-- UPGRADED: log4j-core updated from 2.14.1 (CVE-2021-44228 Log4Shell) to 2.23.1.
+             Version 2.14.1 has a critical Remote Code Execution vulnerability. -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.14.1</version>
+            <version>2.23.1</version>
         </dependency>
-        <!-- SECURITY VIOLATION: commons-collections 3.2.1 has CVE-2015-6420 (RCE) -->
+
+        <!-- UPGRADED: commons-collections updated from 3.2.1 (CVE-2015-6420 RCE) to 3.2.2.
+             Version 3.2.1 has a critical Remote Code Execution vulnerability via deserialization. -->
         <dependency>
             <groupId>commons-collections</groupId>
             <artifactId>commons-collections</artifactId>
-            <version>3.2.1</version>
+            <version>3.2.2</version>
         </dependency>
-        <!-- Oracle JDBC (Java 8) — version managed by Spring Boot 2.7 BOM -->
+
+        <!-- UPGRADED: Oracle JDBC updated to ojdbc11 for Java 11+ / Java 25 compatibility.
+             ojdbc8 targets Java 8 and is not certified for Java 25 runtimes. -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc8</artifactId>
+            <artifactId>ojdbc11</artifactId>
+            <version>23.4.0.24.05</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.oracle.database.nls</groupId>
             <artifactId>orai18n</artifactId>
+            <version>23.4.0.24.05</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ucp</artifactId>
+            <version>23.4.0.24.05</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -67,10 +83,49 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- ADDED: Jakarta Persistence API — required because Spring Boot 3.x / Java 25
+             uses the jakarta.* namespace. The javax.persistence.* imports in Doctor.java
+             must be migrated to jakarta.persistence.* and this dependency provides them. -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+
+        <!-- ADDED: Jakarta Servlet API — required because Spring Boot 3.x dropped the
+             javax.servlet.* namespace. BookingController imports javax.servlet.http.HttpSession
+             which must be migrated to jakarta.servlet.http.HttpSession. -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <!-- UPGRADED: maven-compiler-plugin updated to 3.13.0 for Java 25 support.
+                 Older plugin versions do not understand the Java 25 compiler flags. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <!-- Use release flag instead of deprecated source/target pair -->
+                    <release>25</release>
+                </configuration>
+            </plugin>
+
+            <!-- UPGRADED: maven-surefire-plugin updated to 3.2.5 for Java 25 compatibility.
+                 Older surefire versions fail to fork a Java 25 JVM for test execution. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
