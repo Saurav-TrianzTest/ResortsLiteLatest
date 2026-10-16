@@ -18,7 +18,7 @@ public class BookingController {
     private BookingService bookingService;
 
     // VIOLATION cr-java-0067 [Cloud Compatibility / Mandatory]: In-memory cache without TTL
-    // breaks horizontal scaling — cache is instance-local, invisible to other EC2 instances
+    // breaks horizontal scaling — cache is instance-local, invisible to other EC2 instances.
     private static final Map<String, Object> bookingCache = new HashMap<>(); // cr-java-0067
 
     @PostMapping("/create")
@@ -78,8 +78,7 @@ public class BookingController {
     @GetMapping("/report/download")
     public Map<String, Object> downloadReport(@RequestParam String month) {
         // VIOLATION czr-java-001 [Software Portability / Mandatory]: Hardcoded absolute
-        // file path. This path does not exist inside a container image. Container images
-        // have their own isolated file systems — /var/legacy/reports won't be present.
+        // file path. This path does not exist inside a container image.
         String reportPath = "/var/legacy/reports/" + month + "_bookings.pdf"; // czr-java-001
 
         Map<String, Object> response = new HashMap<>();
