@@ -19,6 +19,7 @@
 
     <properties>
         <java.version>1.8</java.version>
+        <aws.sdk.version>2.25.40</aws.sdk.version>
     </properties>
 
     <dependencies>
@@ -46,6 +47,70 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <!-- AWS SDK v2 S3 dependency for cloud-native file storage (replaces local file paths) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS SDK v2 URL Connection HTTP client -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- AWS Secrets Manager SDK — used by BookingService to retrieve DB credentials
+             at runtime instead of hard-coding them in source (cr-java-0069 fix) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>secretsmanager</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- Jackson Databind — used to parse the JSON secret returned by Secrets Manager -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <!-- AWS SDK v2 SSM dependency — used to retrieve environment-specific URLs from
+             AWS Systems Manager Parameter Store (cr-java-0071 fix).
+             Parameters: /resortslite/inventory/service-url, /resortslite/reports/download-base-url -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ssm</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- cr-java-0090 FIX: AWS Cognito Identity Provider SDK — used by BookingService
+             to replace file-based MD5 authentication with Amazon Cognito user identity
+             management. Confirmation codes are now generated via Cognito's secure token
+             mechanism instead of a local MD5 hash over guest data. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>cognitoidentityprovider</artifactId>
+            <version>${aws.sdk.version}</version>
+        </dependency>
+        <!-- cr-java-0065 FIX: Spring Session Data Redis — transparently replaces the
+             in-process HttpSession store with Amazon ElastiCache for Redis.
+             All session.setAttribute / session.getAttribute calls in BookingController
+             are now serialised to Redis, enabling stateless application instances and
+             true horizontal scaling behind the AWS ALB without sticky sessions. -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+        </dependency>
+        <!-- Lettuce Redis client required by Spring Session Data Redis -->
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+        </dependency>
+        <!-- cr-java-0067 FIX: Spring Data Redis — provides RedisTemplate for Amazon ElastiCache
+             for Redis. Replaces the unbounded static in-memory HashMap (bookingCache) in
+             BookingController with a centralised, TTL-enforced Redis cache shared across all
+             EC2 instances. Prevents unbounded memory growth and stale data inconsistencies
+             in horizontally-scaled cloud deployments. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
     </dependencies>
 
