@@ -6,15 +6,16 @@
     <modelVersion>4.0.0</modelVersion>
 
     <!--
-        UPGRADED: Spring Boot parent updated from 2.7.15 to 3.3.4.
-        Spring Boot 2.7.x targets Java 8/11/17 and cannot run on Java 25.
-        Spring Boot 3.3.x is the minimum baseline that supports Java 25 and
-        uses the Jakarta EE 10 namespace (jakarta.*) instead of javax.*.
+        UPGRADED: Spring Boot parent updated from 3.3.4 to 3.5.3.
+        Spring Boot 3.3.x bundles ASM 9.6 which does not recognise Java 25 class-file
+        major version 69, causing the spring-boot-maven-plugin repackage goal to fail
+        with "Unsupported class file major version 69".
+        Spring Boot 3.5.x bundles ASM 9.7+ which fully supports Java 25 bytecode.
     -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.4</version>
+        <version>3.5.3</version>
         <relativePath/>
     </parent>
 
@@ -22,18 +23,18 @@
     <artifactId>resortsLite</artifactId>
     <version>1.0.0</version>
     <name>ResortsLite</name>
-    <description>Resort booking demo — upgraded to Java 25 / Spring Boot 3.3.x</description>
+    <description>Resort booking demo — upgraded to Java 25 / Spring Boot 3.5.x</description>
 
     <properties>
         <!--
-            UPGRADED: java.version changed from 1.8 to 25.
+            UPGRADED: java.version set to 25.
             The old value caused the compiler to emit Java 8 bytecode even on a Java 25 JDK,
-            preventing use of any Java 9–25 language features and APIs.
+            preventing use of any Java 9-25 language features and APIs.
         -->
         <java.version>25</java.version>
         <!--
             UPGRADED: Use maven.compiler.release instead of the deprecated source/target pair.
-            The --release flag enforces both the language level and the API surface of the
+            The -release flag enforces both the language level and the API surface of the
             target JDK, preventing accidental use of APIs removed before Java 25.
         -->
         <maven.compiler.release>25</maven.compiler.release>
@@ -146,7 +147,7 @@
                 UPGRADED: maven-compiler-plugin updated to 3.13.0 for Java 25 support.
                 Older plugin versions (e.g. 3.7.0) do not understand the Java 25 compiler
                 flags and will fail with "release version 25 not supported".
-                The <release> element replaces the deprecated <source>/<target> pair.
+                The release element replaces the deprecated source/target pair.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -158,17 +159,21 @@
             </plugin>
 
             <!--
-                UPGRADED: maven-surefire-plugin updated to 3.2.5 for Java 25 compatibility.
+                UPGRADED: maven-surefire-plugin updated to 3.5.3 for Java 25 compatibility.
                 Older surefire versions fail to fork a Java 25 JVM for test execution and
                 produce "Unsupported class file major version" errors during the test phase.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>3.5.3</version>
             </plugin>
 
-            <!-- Spring Boot Maven plugin — version managed by spring-boot-starter-parent -->
+            <!--
+                Spring Boot Maven plugin — version managed by spring-boot-starter-parent.
+                Spring Boot 3.5.x bundles ASM 9.7+ which supports Java 25 class-file
+                major version 69, fixing the repackage failure seen with 3.3.x.
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
