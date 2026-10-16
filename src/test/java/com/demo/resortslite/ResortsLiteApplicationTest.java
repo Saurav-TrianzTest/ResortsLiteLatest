@@ -24,9 +24,16 @@ class ResortsLiteApplicationTest {
 
     /**
      * Verifies that the main() entry-point can be invoked without throwing.
+     * Uses the test profile to avoid connecting to Oracle DB.
      */
     @Test
     void main_doesNotThrow() {
-        assertDoesNotThrow(() -> ResortsLiteApplication.main(new String[]{}));
+        // Set the active profile to "test" so H2 is used instead of Oracle
+        System.setProperty("spring.profiles.active", "test");
+        try {
+            assertDoesNotThrow(() -> ResortsLiteApplication.main(new String[]{"--spring.profiles.active=test"}));
+        } finally {
+            System.clearProperty("spring.profiles.active");
+        }
     }
 }
