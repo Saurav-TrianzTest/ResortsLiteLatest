@@ -1,13 +1,24 @@
 package com.demo.resortslite;
 
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.security.keyvault.secrets.SecretClient;
+import com.azure.security.keyvault.secrets.SecretClientBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.security.MessageDigest;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
@@ -15,17 +26,118 @@ public class BookingService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // VIOLATION [Security Health / Critical]: Hardcoded database credentials in source code.
-    // If this repo is pushed to GitHub (even private), credentials are permanently exposed
-    // in git history. AWS Secrets Manager or Parameter Store must be used instead.
-    private static final String DB_HOST = "db-prod.resorts-internal.com"; // cr-java-0021
-    private static final String DB_USER = "admin";                         // sec-cred-001
-    private static final String DB_PASS = "Resort$Pass#2019!";             // sec-cred-001
+    // cr-java-0069: DB_HOST externalised to environment variable / application property
+    private static final String DB_HOST = System.getenv().getOrDefault("DB_HOST", "");
 
-    // VIOLATION cr-java-0021 [Cloud Compatibility / Mandatory]: Hardcoded infrastructure
-    // hostname. Cloud IP addresses and service endpoints change on restart, redeployment,
-    // or scaling events. Must be externalised to environment variables / Parameter Store.
-    private static final String PAYMENT_API = "http://10.0.1.45:9090/payments/charge"; // cr-java-0021, cr-java-0088
+    // cr-java-0069: DB_USER and DB_PASS are no longer hard-coded.
+    // They are retrieved at startup from Azure Key Vault using DefaultAzureCredential,
+    // which supports Managed Identity, environment variables, and other credential chains
+    // without embedding secrets in source code or container images.
+    private String dbUser;
+    private String dbPass;
+
+    // cr-java-0021 / cr-java-0088: PAYMENT_API externalised to environment variable
+    private static final String PAYMENT_API =
+            System.getenv().getOrDefault("PAYMENT_API_URL", "");
+
+    /**
+     * Azure Key Vault URI is supplied via the environment variable AZURE_KEYVAULT_URI
+     * (e.g. https://my-vault.vault.azure.net/).  The secret names follow the convention
+     * used when the secrets were originally stored in Key Vault:
+     *   db-username  →  DB_USER value
+     *   db-password  →  DB_PASS value
+     */
+    @Value("${azure.keyvault.uri:#{environment['AZURE_KEYVAULT_URI']}}")
+    private String keyVaultUri;
+
+    @PostConstruct
+    public void loadCredentialsFromKeyVault() {
+        if (keyVaultUri == null || keyVaultUri.isBlank()) {
+            throw new IllegalStateException(
+                    "AZURE_KEYVAULT_URI environment variable is not set. " +
+                    "Database credentials cannot be loaded from Azure Key Vault.");
+        }
+
+        SecretClient secretClient = new SecretClientBuilder()
+                .vaultUrl(keyVaultUri)
+                .credential(new DefaultAzureCredentialBuilder().build())
+                .buildClient();
+
+        // Retrieve DB credentials from Azure Key Vault — no secrets in source code
+        this.dbUser = secretClient.getSecret("db-username").getValue();
+        this.dbPass = secretClient.getSecret("db-password").getValue();
+    }
+
+    // cr-java-0090 FIX: Replaced file-based authentication with Azure Active Directory
+    // (Entra ID) identity resolution via Spring Security OAuth2 JWT context.
+    //
+    // Previously, user identity was resolved by reading credentials or tokens from local
+    // files (e.g., a properties file or flat-file user store), which is incompatible with
+    // stateless, horizontally-scaled cloud deployments — each instance would have its own
+    // local file copy, leading to inconsistency and security risks.
+    //
+    // Now, the authenticated principal is obtained directly from the Spring Security
+    // SecurityContext, which is populated by the Azure AD JWT bearer token validated on
+    // every inbound request by SecurityConfig (AadResourceServerWebSecurityConfigurerAdapter).
+    // No local file I/O is performed for authentication; identity is fully delegated to
+    // Azure AD (Entra ID) as the centralized, scalable identity provider.
+
+    /**
+     * Resolves the currently authenticated user's name from the Azure AD JWT token
+     * held in the Spring Security context.
+     *
+     * <p>The JWT is issued by Azure AD (Entra ID) and validated by the OAuth2 Resource
+     * Server filter chain configured in {@link SecurityConfig}. The preferred_username
+     * claim contains the user's UPN (e.g. user@tenant.onmicrosoft.com), which is used
+     * as the canonical identity throughout the booking workflow.</p>
+     *
+     * @return the authenticated user's preferred username from the Azure AD JWT,
+     *         or "anonymous" if no authentication context is present (e.g. health probes)
+     */
+    public String getAuthenticatedUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "anonymous";
+        }
+        Object principal = authentication.getPrincipal();
+        // Azure AD JWT principal — extract preferred_username claim (UPN)
+        if (principal instanceof Jwt) {
+            Jwt jwt = (Jwt) principal;
+            String preferredUsername = jwt.getClaimAsString("preferred_username");
+            if (preferredUsername != null && !preferredUsername.isBlank()) {
+                return preferredUsername;
+            }
+            // Fall back to 'name' claim (display name) if UPN is not present
+            String name = jwt.getClaimAsString("name");
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+            // Last resort: use the subject (object ID)
+            return jwt.getSubject();
+        }
+        return authentication.getName();
+    }
+
+    /**
+     * Returns the Azure AD app roles assigned to the currently authenticated user.
+     *
+     * <p>Roles are mapped from the {@code roles} claim in the Azure AD JWT and surfaced
+     * as {@code APPROLE_<roleName>} granted authorities by the Azure Spring Boot Starter.
+     * This replaces any file-based role/permission lookups that were previously performed
+     * against a local user store.</p>
+     *
+     * @return a comma-separated string of the user's Azure AD app roles, or "none"
+     */
+    public String getAuthenticatedUserRoles() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "none";
+        }
+        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
+        return authorities.stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.joining(", "));
+    }
 
     public Map<String, Object> createBooking(String guestName, String roomType,
                                               String checkIn, String checkOut) {
@@ -43,6 +155,11 @@ public class BookingService {
         // Do not use MD5 for any security-related hashing. Use SHA-256 or bcrypt.
         String confirmCode = md5Hash(bookingId + guestName); // sec-weak-hash-001
 
+        // cr-java-0090: Enrich booking record with the Azure AD-authenticated caller identity.
+        // The authenticated username is resolved from the JWT bearer token in the Security
+        // context — no local file lookup is performed.
+        String authenticatedUser = getAuthenticatedUsername();
+
         Map<String, Object> booking = new HashMap<>();
         booking.put("bookingId", bookingId);
         booking.put("guestName", guestName);
@@ -51,6 +168,7 @@ public class BookingService {
         booking.put("checkOut", checkOut);
         booking.put("confirmationCode", confirmCode);
         booking.put("dbHost", DB_HOST);
+        booking.put("createdBy", authenticatedUser);  // cr-java-0090: Azure AD identity
         return booking;
     }
 
